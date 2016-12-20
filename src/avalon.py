@@ -18,12 +18,12 @@ def get_default_roles(num_players):
     return get_default_good_roles(num_players) + get_default_evil_roles(num_players)
 
 def assign_team_ids(pids, intgen):
-    """
+    '''
     pids: [t]
     intgen: int -> int -> int
     return: [Player]
 
-    """
+    '''
     roles = get_default_roles(len(pids))
     shuffled_roles = shuffle(roles, intgen)
     return map(lambda pid, role: r.Player(pid, role), pids, shuffled_roles)
@@ -49,10 +49,29 @@ class Game(object):
 
     @expect_status(m.GameStatus.not_started)
     def add_players(self, pids, intgen=randint):
+        if (not (r.MIN_PLAYERS <= len(pids) <= r.MAX_PLAYERS) or
+            len(pids) != len(set(pids))):
+            self.status = m.GameStatus.error
+            self.error = 'too few players'
+            return
         self.status = m.GameStatus.nominating_team
         self.pids = deepcopy(pids)
         self.current_leader = intgen(0, len(pids) - 1)
         self.players = assign_team_ids(pids, intgen)
+
+    def get_visibility(self):
+        '''
+        Returns a mapping of pid -> (Role, [pid])?
+        '''
+        
+        def strip_roles(result):
+            if result:
+                role, players = result
+                return (role, [p.pid for p in players])
+
+        if self.status in [m.GameStatus.error, m.GameStatus.not_started]:
+            return
+        return dict([(p.pid, strip_roles(r.can_see_which_other_players(p, self.players))) for p in self.players])
 
     def copy(self):
         game = Game()

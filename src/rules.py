@@ -1,7 +1,7 @@
-"""
+'''
 Various rules and parameters of the game, with stateless transformations.
 
-"""
+'''
 from copy import deepcopy
 from collections import namedtuple
 
@@ -83,11 +83,11 @@ def is_quest_vote_valid(vote, role):
     return is_evil(role) or (vote is m.Vote.yes)
 
 def can_see_which_other_players(player, players):
-    """
+    '''
     Returns the pids for which this player can know of the others.
     player -> [player] -> (Role, [player])
 
-    """
+    '''
     if player.role is m.Role.merlin:
         return (m.Role.minion,
                 filter(lambda p: is_evil(p.role) and p.role is not m.Role.mordred, players))
@@ -102,5 +102,3 @@ def can_see_which_other_players(player, players):
                 filter(lambda p: (p != player and
                                   is_evil(p.role) and
                                   p.role is not m.Role.oberon), players))
-    else:
-        return []

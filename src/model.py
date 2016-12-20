@@ -1,34 +1,34 @@
 class Role(object):
-    servant = 0
-    minion = 1
-    merlin = 2
-    assassin = 3
-    percival = 4
-    mordred = 5
-    morgana = 6
-    oberon = 7
+    servant = 'servant'
+    minion = 'minion'
+    merlin = 'merlin'
+    assassin = 'assassin'
+    percival = 'percival'
+    mordred = 'mordred'
+    morgana = 'morgana'
+    oberon = 'oberon'
 
 class Team(object):
-    good = 0
-    evil = 1
+    good = 'good'
+    evil = 'evil'
 
 class Vote(object):
-    yes = 0
-    no = 1
+    yes = 'yes'
+    no = 'no'
 
 class VoteStatus(object):
-    unknown = 0
-    succeeded = 1
-    failed = 2
+    unknown = 'unknown'
+    succeeded = 'succeeded'
+    failed = 'failed'
 
 class GameStatus(object):
-    error = -1
-    not_started = 0
-    nominating_team = 1
-    voting_for_team = 2
-    voting_for_mission = 3
-    done = 4
+    error = 'error'
+    not_started = 'not_started'
+    nominating_team = 'nominating_team'
+    voting_for_team = 'voting_for_team'
+    voting_for_mission = 'voting_for_mission'
+    done = 'done'
 
 class MerlinStatus(object):
-    alive = 0
-    dead = 1
+    alive = 'alive'
+    dead = 'dead'

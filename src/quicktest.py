@@ -1,5 +1,5 @@
-import action
-g = action.create_game()
-action.start_game(g, range(6))
-print g
-print action.get_visibility(g)
+import avalon
+g = avalon.Game()
+g.add_players(range(5), lambda a,b: b)
+print g.players
+print g.get_visibility()
