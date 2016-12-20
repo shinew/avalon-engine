@@ -32,10 +32,20 @@ def expect_status(status):
     def h(f):
         def g(self, *args, **kwargs):
             if self.status != status:
+                self.status = m.GameStatus.error
+                self.error = 'expected status {}, given {}'.format(status, self.status)
                 return
             return f(self, *args, **kwargs)
         return g
     return h
+
+def expect_initialized(f):
+    def g(self, *args, **kwargs):
+        if self.status in [m.GameStatus.error, m.GameStatus.not_started]:
+            self.error = 'ran a method that requires initialization'
+            return
+        return f(self, *args, **kwargs)
+    return g
 
 class Game(object):
     def __init__(self):
@@ -43,8 +53,10 @@ class Game(object):
         self.players = []
         self.state = r.GameState()
         self.status = m.GameStatus.not_started
-        self.current_leader = None
+        self.current_leader = 0
         self.current_team = []
+        self.current_quest = 0
+        self.current_proposal = 0
         self.error = None
 
     @expect_status(m.GameStatus.not_started)
@@ -59,26 +71,33 @@ class Game(object):
         self.current_leader = intgen(0, len(pids) - 1)
         self.players = assign_team_ids(pids, intgen)
 
+    @expect_initialized
     def get_visibility(self):
         '''
         Returns a mapping of pid -> (Role, [pid])?
+
         '''
-        
         def strip_roles(result):
             if result:
                 role, players = result
                 return (role, [p.pid for p in players])
-
-        if self.status in [m.GameStatus.error, m.GameStatus.not_started]:
-            return
         return dict([(p.pid, strip_roles(r.can_see_which_other_players(p, self.players))) for p in self.players])
 
+    @expect_status(m.GameStatus.nominating_team)
+    def nominate_team(self, pids):
+        if (any(p not in self.pids for p in pids) or
+            len(pids) != len(set(pids)) or
+            len(pids) != r.size_of_proposed_team(self.current_quest, len(self.pids))):
+            self.status = m.GameStatus.error
+            self.error = 'bad team nomination'
+            return
+        self.status = m.GameStatus.voting_for_team
+        self.current_team = deepcopy(pids)
+
+    @property
+    @expect_initialized
+    def leader(self):
+        return self.pids[self.current_leader]
+
     def copy(self):
-        game = Game()
-        game.pids = deepcopy(self.pids)
-        game.players = deepcopy(self.players)
-        game.state = self.state.copy()
-        game.status = self.status
-        game.current_leader = self.current_leader
-        game.current_team = deepcopy(self.current_team)
-        game.error = deepcopy(self.error)
+        return deepcopy(self)
