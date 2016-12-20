@@ -1,0 +1,25 @@
+"""
+User-facing API.
+
+Every call may throw.
+
+"""
+import model as m
+import helper as h
+
+def start_game(game, pids, intgen=lambda a,b: b):
+    """
+    Assigns roles to the given pids according to intgen.
+    intgen: int -> int -> int
+
+    """
+    assert game.state = m.GameState.adding_players
+    game.players = h.assign_team_ids(pids, intgen)
+
+def get_visibility(game):
+    """
+    Computes a mapping of pids to which players should know of which others.
+    return: {pid: [players]}
+    """
+    assert game.state != m.GameState.adding_players
+    return dict([(p.pid, h.see_other_players(p, game.players)) for p in game.players])
