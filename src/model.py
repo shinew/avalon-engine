@@ -22,6 +22,8 @@ class VoteStatus(object):
     failed = 2
 
 class GameStatus(object):
+    error = -1
+    not_started = 0
     nominating_team = 1
     voting_for_team = 2
     voting_for_mission = 3

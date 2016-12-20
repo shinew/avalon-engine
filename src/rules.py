@@ -2,7 +2,8 @@
 Various rules and parameters of the game, with stateless transformations.
 
 """
-import copy
+from copy import deepcopy
+from collections import namedtuple
 
 import model as m
 
@@ -15,14 +16,14 @@ NUM_QUESTS = 5
 
 Player = namedtuple('Player', 'pid role')
 
-class GameStatus(object):
+class GameState(object):
     def __init__(self):
         self.quests = [m.VoteStatus.unknown] * NUM_QUESTS
         self.nominations = [m.VoteStatus.unknown] * NUM_NOMINATIONS
         self.merlin = m.MerlinStatus.alive
 
     def copy(self):
-        return copy.deepcopy(self)
+        return deepcopy(self)
 
 
 def num_good_players(num_players):
