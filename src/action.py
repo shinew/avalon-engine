@@ -41,3 +41,4 @@ def select_team(game, pid, pids):
     """
     assert game.state == m.GameState.team_selection
     assert game.current_leader.pid == pid
+    game.
