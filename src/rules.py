@@ -63,7 +63,7 @@ class GameState(object):
         }
         def pretty_print(lst):
             return ''.join(map(lambda x: mapping[x], lst))
-        return "Quests: {}\nNominations: {}".format(*map(pretty_print, [self.quests, self.nominations]))
+        return 'Quests: {}\nNominations: {}'.format(*map(pretty_print, [self.quests, self.nominations]))
 
 def num_good_players(num_players):
     mapping = {
@@ -99,15 +99,14 @@ def size_of_proposed_team(quest, num_players):
     ]
     return mapping[quest][num_players - MIN_PLAYERS]
 
-def can_go_on_quest(yes_votes, num_votes):
-    return yes_votes * 2 > num_votes
+def votes_needed_for_team(num_players):
+    return num_players / 2 + 1
 
-def does_quest_succeed(quest, votes):
-    num_fails = votes.count(m.Vote.no)
-    if quest == 3 and len(votes) >= 7:
-        return num_fails <= 1
+def votes_needed_for_quest(quest, num_players):
+    if quest == 3 and num_players >= 7:
+        return size_of_proposed_team(quest, num_players) - 1
     else:
-        return num_fails == 0
+        return size_of_proposed_team(quest, num_players)
 
 def is_quest_vote_valid(vote, role):
     return is_evil(role) or (vote is m.Vote.yes)

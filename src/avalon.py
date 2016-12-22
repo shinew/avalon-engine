@@ -43,14 +43,14 @@ def expect_status(status):
 def expect_initialized(f):
     @wraps(f)
     def g(self, *args, **kwargs):
-        if self.status in [m.GameStatus.error, m.GameStatus.not_started]:
+        if self.status is m.GameStatus.not_started:
             self._update_error('ran a method that requires initialization')
             return
         return f(self, *args, **kwargs)
     return g
 
 class Game(object):
-    def __init__(self):
+    def __init__(self, intgen=randint):
         self.status = m.GameStatus.not_started
         self.pids = []
         self.players = []
@@ -59,17 +59,18 @@ class Game(object):
         self.current_team = []  # list of pids
         self._winner = None
         self.error = None
+        self.intgen = intgen
 
     @expect_status(m.GameStatus.not_started)
-    def add_players(self, pids, intgen=randint):
+    def add_players(self, pids):
         if (not (r.MIN_PLAYERS <= len(pids) <= r.MAX_PLAYERS) or
             len(pids) != len(set(pids))):
             self._update_error('wrong number of players')
             return
         self.status = m.GameStatus.nominating_team
         self.pids = deepcopy(pids)
-        self.leader_idx = intgen(0, len(pids) - 1)
-        self.players = assign_team_ids(pids, intgen)
+        self.leader_idx = self.intgen(0, len(pids) - 1)
+        self.players = assign_team_ids(pids, self.intgen)
 
     @expect_initialized
     def get_visibility(self):
@@ -87,12 +88,12 @@ class Game(object):
 
     @expect_initialized
     def get_expected_team_size(self):
-        return r.size_of_proposed_team(self.state.current_quest, len(self.pids))
+        return r.size_of_proposed_team(self.state.current_quest, self.num_players)
 
     @expect_status(m.GameStatus.nominating_team)
     def nominate_team(self, pids):
         if (not self._are_unique_valid_pids(pids) or
-            len(pids) != r.size_of_proposed_team(self.state.current_quest, len(self.pids))):
+            len(pids) != r.size_of_proposed_team(self.state.current_quest, self.num_players)):
             self._update_error('bad nominate-team')
             return
 
@@ -102,12 +103,12 @@ class Game(object):
     @expect_status(m.GameStatus.voting_for_team)
     def vote_for_team(self, pid_votes):
         if (not self._are_unique_valid_pids([pv.pid for pv in pid_votes]) or
-            len(pid_votes) < len(self.pids)):
+            len(pid_votes) < self.num_players):
             self._update_error('bad vote-for-team')
             return
 
         yes_votes = len([pv for pv in pid_votes if pv.vote == m.Vote.yes])
-        if r.can_go_on_quest(yes_votes, len(pid_votes)):
+        if yes_votes >= r.votes_needed_for_team(self.num_players):
             self.status = m.GameStatus.voting_for_mission
             self.state.increment_nomination(m.VoteStatus.succeeded)
         else:
@@ -115,6 +116,7 @@ class Game(object):
             if self.state.does_evil_win():
                 self.winner = m.Team.evil
             else:
+                self.status = m.GameStatus.nominating_team
                 self.increment_leader()
 
     @expect_status(m.GameStatus.voting_for_mission)
@@ -125,7 +127,8 @@ class Game(object):
             self._update_error('bad vote-for-mission')
             return
 
-        if r.does_quest_succeed(self.state.current_quest, [pv.vote for pv in pid_votes]):
+        yes_votes = [pv.vote for pv in pid_votes].count(m.Vote.yes)
+        if yes_votes >= r.votes_needed_for_quest(self.state.current_quest, self.num_players):
             self.state.increment_quest(m.VoteStatus.succeeded)
         else:
             self.state.increment_quest(m.VoteStatus.failed)
@@ -157,11 +160,16 @@ class Game(object):
 
     @property
     @expect_initialized
+    def num_players(self):
+        return len(self.pids)
+
+    @property
+    @expect_initialized
     def leader(self):
         return self.pids[self.leader_idx]
 
     def increment_leader(self):
-        self.leader_idx = (self.leader_idx + 1) % len(self.pids)
+        self.leader_idx = (self.leader_idx + 1) % self.num_players
 
     def _are_unique_valid_pids(self, pids):
         return (all(p in self.pids for p in pids) and
@@ -176,3 +184,10 @@ class Game(object):
 
     def copy(self):
         return deepcopy(self)
+
+    def __str__(self):
+        ret = 'Status: {}\nState: {}\nCurrent Leader: {}\nCurrent Team: {}\nWinner: {}'.format(
+            self.status, self.state, self.leader, self.current_team, self._winner)
+        if self.error:
+            ret += '\nError:{}'.format(self.error)
+        return ret
