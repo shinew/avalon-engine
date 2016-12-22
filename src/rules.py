@@ -13,18 +13,57 @@ MAX_PLAYERS = 10
 NUM_NOMINATIONS = 5
 NUM_QUESTS = 5
 
-
 Player = namedtuple('Player', 'pid role')
+PlayerVote = namedtuple('PlayerVote', 'pid vote')
 
 class GameState(object):
     def __init__(self):
         self.quests = [m.VoteStatus.unknown] * NUM_QUESTS
-        self.nominations = [m.VoteStatus.unknown] * NUM_NOMINATIONS
+        self._clear_nominations()
         self.merlin = m.MerlinStatus.alive
+
+    @property
+    def current_quest(self):
+        return self.quests.index(m.VoteStatus.unknown)
+
+    @property
+    def current_nomination(self):
+        return self.nominations.index(m.VoteStatus.unknown)
+
+    def increment_quest(self, vote_status):
+        self.quests[self.current_quest] = vote_status
+        self._clear_nominations()
+
+    def _clear_nominations(self):
+        self.nominations = [m.VoteStatus.unknown] * NUM_NOMINATIONS
+
+    def increment_nomination(self, vote_status):
+        self.nominations[self.current_nomination] = vote_status
+
+    def does_good_win(self):
+        return (self.does_good_win_minus_merlin() and
+                self.merlin is m.MerlinStatus.alive)
+
+    def does_good_win_minus_merlin(self):
+        return self.quests.count(m.VoteStatus.succeeded) >= 3
+
+    def does_evil_win(self):
+        return (self.quests.count(m.VoteStatus.failed) >= 3 or
+                self.merlin is m.MerlinStatus.dead or
+                self.nominations.count(m.VoteStatus.failed) == 5)
 
     def copy(self):
         return deepcopy(self)
 
+    def __str__(self):
+        mapping = {
+            m.VoteStatus.succeeded: 'Y',
+            m.VoteStatus.failed: 'X',
+            m.VoteStatus.unknown: '?',
+        }
+        def pretty_print(lst):
+            return ''.join(map(lambda x: mapping[x], lst))
+        return "Quests: {}\nNominations: {}".format(*map(pretty_print, [self.quests, self.nominations]))
 
 def num_good_players(num_players):
     mapping = {
@@ -50,7 +89,7 @@ def is_good(role):
 def is_evil(role):
     return role_to_team(role) is m.Team.evil
 
-def size_of_proposed_team(quest_num, num_players):
+def size_of_proposed_team(quest, num_players):
     mapping = [
         [2, 2, 2, 3, 3, 3],
         [3, 3, 3, 4, 4, 4],
@@ -58,26 +97,17 @@ def size_of_proposed_team(quest_num, num_players):
         [3, 3, 4, 5, 5, 5],
         [3, 4, 4, 5, 5, 5],
     ]
-    return mapping[quest_num][num_players - MIN_PLAYERS]
+    return mapping[quest][num_players - MIN_PLAYERS]
 
-def can_go_on_quest(votes):
-    return votes.count(m.Vote.yes) * 2 > len(votes)
+def can_go_on_quest(yes_votes, num_votes):
+    return yes_votes * 2 > num_votes
 
-def does_quest_succeed(quest_num, votes):
+def does_quest_succeed(quest, votes):
     num_fails = votes.count(m.Vote.no)
-    if quest_num == 3 and len(votes) >= 7:
+    if quest == 3 and len(votes) >= 7:
         return num_fails <= 1
     else:
         return num_fails == 0
-
-def does_good_win(game_status):
-    return (game_status.quests.count(m.VoteStatus.succeeded) == 3 and
-            game_status.merlin is m.MerlinStatus.alive)
-
-def does_evil_win(game_status):
-    return (game_status.quests.count(m.VoteStatus.failed) >= 3 or
-            game_status.merlin is m.MerlinStatus.dead or
-            game_status.nominations.count(m.VoteStatus.failed) == 5)
 
 def is_quest_vote_valid(vote, role):
     return is_evil(role) or (vote is m.Vote.yes)

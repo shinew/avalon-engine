@@ -27,6 +27,7 @@ class GameStatus(object):
     nominating_team = 'nominating_team'
     voting_for_team = 'voting_for_team'
     voting_for_mission = 'voting_for_mission'
+    guessing_merlin = 'guessing_merlin'
     done = 'done'
 
 class MerlinStatus(object):

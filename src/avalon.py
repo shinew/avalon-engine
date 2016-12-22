@@ -1,6 +1,7 @@
-from copy import deepcopy
-from random import randint
 from collections import namedtuple
+from copy import deepcopy
+from functools import wraps
+from random import randint
 
 import model as m
 import rules as r
@@ -30,74 +31,148 @@ def assign_team_ids(pids, intgen):
 
 def expect_status(status):
     def h(f):
+        @wraps(f)
         def g(self, *args, **kwargs):
             if self.status != status:
-                self.status = m.GameStatus.error
-                self.error = 'expected status {}, given {}'.format(status, self.status)
+                self._update_error('expected previous status {}, given {}'.format(status, self.status))
                 return
             return f(self, *args, **kwargs)
         return g
     return h
 
 def expect_initialized(f):
+    @wraps(f)
     def g(self, *args, **kwargs):
         if self.status in [m.GameStatus.error, m.GameStatus.not_started]:
-            self.error = 'ran a method that requires initialization'
+            self._update_error('ran a method that requires initialization')
             return
         return f(self, *args, **kwargs)
     return g
 
 class Game(object):
     def __init__(self):
+        self.status = m.GameStatus.not_started
         self.pids = []
         self.players = []
         self.state = r.GameState()
-        self.status = m.GameStatus.not_started
-        self.current_leader = 0
-        self.current_team = []
-        self.current_quest = 0
-        self.current_proposal = 0
+        self.leader_idx = 0  # index of pids
+        self.current_team = []  # list of pids
+        self._winner = None
         self.error = None
 
     @expect_status(m.GameStatus.not_started)
     def add_players(self, pids, intgen=randint):
         if (not (r.MIN_PLAYERS <= len(pids) <= r.MAX_PLAYERS) or
             len(pids) != len(set(pids))):
-            self.status = m.GameStatus.error
-            self.error = 'too few players'
+            self._update_error('wrong number of players')
             return
         self.status = m.GameStatus.nominating_team
         self.pids = deepcopy(pids)
-        self.current_leader = intgen(0, len(pids) - 1)
+        self.leader_idx = intgen(0, len(pids) - 1)
         self.players = assign_team_ids(pids, intgen)
 
     @expect_initialized
     def get_visibility(self):
         '''
-        Returns a mapping of pid -> (Role, [pid])?
+        @return: { pid : (Role, [pid])? }
+        Role being what pid sees the other pids as (either merlin or minion).
 
         '''
         def strip_roles(result):
             if result:
                 role, players = result
                 return (role, [p.pid for p in players])
+
         return dict([(p.pid, strip_roles(r.can_see_which_other_players(p, self.players))) for p in self.players])
+
+    @expect_initialized
+    def get_expected_team_size(self):
+        return r.size_of_proposed_team(self.state.current_quest, len(self.pids))
 
     @expect_status(m.GameStatus.nominating_team)
     def nominate_team(self, pids):
-        if (any(p not in self.pids for p in pids) or
-            len(pids) != len(set(pids)) or
-            len(pids) != r.size_of_proposed_team(self.current_quest, len(self.pids))):
-            self.status = m.GameStatus.error
-            self.error = 'bad team nomination'
+        if (not self._are_unique_valid_pids(pids) or
+            len(pids) != r.size_of_proposed_team(self.state.current_quest, len(self.pids))):
+            self._update_error('bad nominate-team')
             return
+
         self.status = m.GameStatus.voting_for_team
-        self.current_team = deepcopy(pids)
+        self.current_team = set(deepcopy(pids))
+
+    @expect_status(m.GameStatus.voting_for_team)
+    def vote_for_team(self, pid_votes):
+        if (not self._are_unique_valid_pids([pv.pid for pv in pid_votes]) or
+            len(pid_votes) < len(self.pids)):
+            self._update_error('bad vote-for-team')
+            return
+
+        yes_votes = len([pv for pv in pid_votes if pv.vote == m.Vote.yes])
+        if r.can_go_on_quest(yes_votes, len(pid_votes)):
+            self.status = m.GameStatus.voting_for_mission
+            self.state.increment_nomination(m.VoteStatus.succeeded)
+        else:
+            self.state.increment_nomination(m.VoteStatus.failed)
+            if self.state.does_evil_win():
+                self.winner = m.Team.evil
+            else:
+                self.increment_leader()
+
+    @expect_status(m.GameStatus.voting_for_mission)
+    def vote_for_mission(self, pid_votes):
+        if (not self._are_unique_valid_pids([pv.pid for pv in pid_votes]) or
+            set([pv.pid for pv in pid_votes]) != self.current_team or
+            not all(r.is_quest_vote_valid(pv.vote, self._pid_to_role(pv.pid)) for pv in pid_votes)):
+            self._update_error('bad vote-for-mission')
+            return
+
+        if r.does_quest_succeed(self.state.current_quest, [pv.vote for pv in pid_votes]):
+            self.state.increment_quest(m.VoteStatus.succeeded)
+        else:
+            self.state.increment_quest(m.VoteStatus.failed)
+
+        if self.state.does_good_win_minus_merlin():
+            self.status = m.GameStatus.guessing_merlin
+        elif self.state.does_evil_win():
+            self.winner = m.Team.evil
+        else:
+            self.status = m.GameStatus.nominating_team
+            self.increment_leader()
+
+    @expect_status(m.GameStatus.guessing_merlin)
+    def guess_merlin(self, pid):
+        if self._pid_to_role(pid) is m.Role.merlin:
+            self.winner = m.Team.evil
+        else:
+            self.winner = m.Team.good
+
+    @expect_status(m.GameStatus.done)
+    def get_winner(self):
+        return self._winner
+
+    def set_winner(self, winner):
+        self.status = m.GameStatus.done
+        self._winner = winner
+
+    winner = property(get_winner, set_winner)
 
     @property
     @expect_initialized
     def leader(self):
-        return self.pids[self.current_leader]
+        return self.pids[self.leader_idx]
+
+    def increment_leader(self):
+        self.leader_idx = (self.leader_idx + 1) % len(self.pids)
+
+    def _are_unique_valid_pids(self, pids):
+        return (all(p in self.pids for p in pids) and
+                len(pids) == len(set(pids)))
+
+    def _pid_to_role(self, pid):
+        return [p for p in self.players if p.pid == pid][0].role
+
+    def _update_error(self, error):
+        self.status = m.GameStatus.error
+        self.error = error
 
     def copy(self):
         return deepcopy(self)
