@@ -22,7 +22,6 @@ class VoteStatus(object):
     failed = 'failed'
 
 class GameStatus(object):
-    error = 'error'
     not_started = 'not_started'
     nominating_team = 'nominating_team'
     voting_for_team = 'voting_for_team'
