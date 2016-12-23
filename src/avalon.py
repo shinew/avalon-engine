@@ -109,7 +109,7 @@ class Game(object):
     @expect_status(m.GameStatus.nominating_team)
     def nominate_team(self, pids):
         if (not self._are_unique_valid_pids(pids) or
-            len(pids) != r.size_of_proposed_team(self.state.current_quest, self.num_players)):
+            len(pids) != r.size_of_nominated_team(self.state.current_quest, self.num_players)):
             self._update_error('bad nominate-team')
             return
 
@@ -183,7 +183,7 @@ class Game(object):
 
     @expect_initialized
     def get_expected_team_size(self):
-        return r.size_of_proposed_team(self.state.current_quest, self.num_players)
+        return r.size_of_nominated_team(self.state.current_quest, self.num_players)
 
     @expect_initialized
     def pid_to_role(self, pid):

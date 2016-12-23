@@ -19,7 +19,7 @@ def positive_test(players, guess_merlin_right):
         size = g.get_expected_team_size()
         for nomination in range(4):
             print 'nomination: {}'.format(nomination)
-            g.nominate_team(random.sample(pids, r.size_of_proposed_team(mission, players)))
+            g.nominate_team(random.sample(pids, r.size_of_nominated_team(mission, players)))
             print_game(g)
             yeses = random.sample(pids, random.randint(0, r.num_votes_for_team(players) - 1))
             g.vote_for_team(map(lambda p: r.PlayerVote(p, m.Vote.yes if p in yeses else m.Vote.no), pids))
@@ -55,7 +55,7 @@ def negative_test(players):
         size = g.get_expected_team_size()
         for nomination in range(4):
             print 'nomination: {}'.format(nomination)
-            g.nominate_team(random.sample(pids, r.size_of_proposed_team(mission, players)))
+            g.nominate_team(random.sample(pids, r.size_of_nominated_team(mission, players)))
             print_game(g)
             yeses = random.sample(pids, random.randint(0, r.num_votes_for_team(players) - 1))
             g.vote_for_team(map(lambda p: r.PlayerVote(p, m.Vote.yes if p in yeses else m.Vote.no), pids))
@@ -74,7 +74,7 @@ def negative_test(players):
         size = g.get_expected_team_size()
         for nomination in range(4):
             print 'nomination: {}'.format(nomination)
-            g.nominate_team(random.sample(pids, r.size_of_proposed_team(mission, players)))
+            g.nominate_team(random.sample(pids, r.size_of_nominated_team(mission, players)))
             print_game(g)
             yeses = random.sample(pids, random.randint(0, r.num_votes_for_team(players) - 1))
             g.vote_for_team(map(lambda p: r.PlayerVote(p, m.Vote.yes if p in yeses else m.Vote.no), pids))

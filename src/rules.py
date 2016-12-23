@@ -95,7 +95,7 @@ def is_good(role):
 def is_evil(role):
     return role_to_team(role) is m.Team.evil
 
-def size_of_proposed_team(quest, num_players):
+def size_of_nominated_team(quest, num_players):
     # quest is 0-indexed
     mapping = [
         [2, 2, 2, 3, 3, 3],
@@ -114,9 +114,9 @@ def num_votes_for_team(num_players):
 
 def num_votes_for_quest(quest, num_players):
     if quest == 3 and num_players >= 7:
-        return size_of_proposed_team(quest, num_players) - 1
+        return size_of_nominated_team(quest, num_players) - 1
     else:
-        return size_of_proposed_team(quest, num_players)
+        return size_of_nominated_team(quest, num_players)
 
 def is_quest_vote_valid(vote, role):
     return is_evil(role) or (vote is m.Vote.yes)
