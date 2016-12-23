@@ -23,6 +23,8 @@ class GameState(object):
         self._clear_nominations()
         self.merlin = m.MerlinStatus.alive
 
+    # -- computed properties --
+
     @property
     def current_quest(self):
         return index_of(lambda x: x == m.VoteStatus.unknown, self.quests)
@@ -30,6 +32,8 @@ class GameState(object):
     @property
     def current_nomination(self):
         return index_of(lambda x: x == m.VoteStatus.unknown, self.nominations)
+
+    # ^^ computed properties ^^
 
     def increment_quest(self, vote_status):
         if self.current_quest is not None:

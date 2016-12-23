@@ -56,7 +56,6 @@ def expect_initialized(f):
 class Game(object):
     def __init__(self, intgen=randint):
         self.status = m.GameStatus.not_started
-        self.pids = []
         self.players = []
         self.state = r.GameState()
         self.current_team = set()  # set of pids
@@ -65,6 +64,8 @@ class Game(object):
         self._winner = None
         self._errors = []
         self._intgen = intgen
+
+    # -- computed properties --
 
     @expect_status(m.GameStatus.done)
     def get_winner(self):
@@ -79,12 +80,21 @@ class Game(object):
     @property
     @expect_initialized
     def num_players(self):
-        return len(self.pids)
+        return len(self.players)
 
     @property
     @expect_initialized
     def leader(self):
         return self.pids[self._leader_idx]
+
+    @property
+    @expect_initialized
+    def pids(self):
+        return [p.pid for p in self.players]
+
+    # ^^ computed properties ^^
+
+    # -- game operations --
 
     @expect_status(m.GameStatus.not_started)
     def add_players(self, pids):
@@ -93,9 +103,8 @@ class Game(object):
             self._update_error('wrong number of players')
             return
         self.status = m.GameStatus.nominating_team
-        self.pids = deepcopy(pids)
-        self._leader_idx = self._intgen(0, len(pids) - 1)
         self.players = assign_team_ids(pids, self._intgen)
+        self._leader_idx = self._intgen(0, len(self.players) - 1)
 
     @expect_status(m.GameStatus.nominating_team)
     def nominate_team(self, pids):
@@ -155,6 +164,8 @@ class Game(object):
             self.winner = m.Team.evil
         else:
             self.winner = m.Team.good
+
+    # ^^ game operations ^^
 
     @expect_initialized
     def get_visibility(self):
