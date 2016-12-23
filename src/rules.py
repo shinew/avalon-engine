@@ -6,7 +6,7 @@ from copy import deepcopy
 from collections import namedtuple
 
 import model as m
-from helper import first_of
+from helper import index_of
 
 
 MIN_PLAYERS = 5
@@ -25,19 +25,16 @@ class GameState(object):
 
     @property
     def current_quest(self):
-        return first_of(self.quests, m.VoteStatus.unknown)
+        return index_of(lambda x: x == m.VoteStatus.unknown, self.quests)
 
     @property
     def current_nomination(self):
-        return first_of(self.nominations, m.VoteStatus.unknown)
+        return index_of(lambda x: x == m.VoteStatus.unknown, self.nominations)
 
     def increment_quest(self, vote_status):
         if self.current_quest is not None:
             self.quests[self.current_quest] = vote_status
             self._clear_nominations()
-
-    def _clear_nominations(self):
-        self.nominations = [m.VoteStatus.unknown] * NUM_NOMINATIONS
 
     def increment_nomination(self, vote_status):
         if self.current_nomination is not None:
@@ -54,6 +51,9 @@ class GameState(object):
         return (self.quests.count(m.VoteStatus.failed) >= 3 or
                 self.merlin is m.MerlinStatus.dead or
                 self.nominations.count(m.VoteStatus.failed) == 5)
+
+    def _clear_nominations(self):
+        self.nominations = [m.VoteStatus.unknown] * NUM_NOMINATIONS
 
     def __str__(self):
         mapping = {

@@ -1,3 +1,7 @@
+'''
+An implementation of the Avalon game.
+
+'''
 from collections import namedtuple
 from copy import deepcopy
 from functools import wraps
@@ -5,7 +9,7 @@ from random import randint
 
 import model as m
 import rules as r
-from helper import shuffle, head
+from helper import shuffle, first_of
 
 def get_default_good_roles(num_players):
     num_good_players = r.num_good_players(num_players)
@@ -55,12 +59,32 @@ class Game(object):
         self.pids = []
         self.players = []
         self.state = r.GameState()
-        self.current_team = []  # list of pids
+        self.current_team = set()  # set of pids
 
         self._leader_idx = 0  # index of pids
         self._winner = None
         self._errors = []
         self._intgen = intgen
+
+    @expect_status(m.GameStatus.done)
+    def get_winner(self):
+        return self._winner
+
+    def set_winner(self, winner):
+        self.status = m.GameStatus.done
+        self._winner = winner
+
+    winner = property(get_winner, set_winner)
+
+    @property
+    @expect_initialized
+    def num_players(self):
+        return len(self.pids)
+
+    @property
+    @expect_initialized
+    def leader(self):
+        return self.pids[self._leader_idx]
 
     @expect_status(m.GameStatus.not_started)
     def add_players(self, pids):
@@ -72,24 +96,6 @@ class Game(object):
         self.pids = deepcopy(pids)
         self._leader_idx = self._intgen(0, len(pids) - 1)
         self.players = assign_team_ids(pids, self._intgen)
-
-    @expect_initialized
-    def get_visibility(self):
-        '''
-        @return: { pid : (Role, [pid])? }
-        Role being what pid sees the other pids as (either merlin or minion).
-
-        '''
-        def strip_roles(result):
-            if result:
-                role, players = result
-                return (role, [p.pid for p in players])
-
-        return dict([(p.pid, strip_roles(r.can_see_which_other_players(p, self.players))) for p in self.players])
-
-    @expect_initialized
-    def get_expected_team_size(self):
-        return r.size_of_proposed_team(self.state.current_quest, self.num_players)
 
     @expect_status(m.GameStatus.nominating_team)
     def nominate_team(self, pids):
@@ -118,7 +124,7 @@ class Game(object):
                 self.winner = m.Team.evil
             else:
                 self.status = m.GameStatus.nominating_team
-                self.increment_leader()
+                self._increment_leader()
 
     @expect_status(m.GameStatus.voting_for_mission)
     def vote_for_mission(self, pid_votes):
@@ -128,6 +134,7 @@ class Game(object):
             self._update_error('bad vote-for-mission')
             return
 
+        self.current_team = set()
         yes_votes = [pv.vote for pv in pid_votes].count(m.Vote.yes)
         if yes_votes >= r.num_votes_for_quest(self.state.current_quest, self.num_players):
             self.state.increment_quest(m.VoteStatus.succeeded)
@@ -140,7 +147,7 @@ class Game(object):
             self.winner = m.Team.evil
         else:
             self.status = m.GameStatus.nominating_team
-            self.increment_leader()
+            self._increment_leader()
 
     @expect_status(m.GameStatus.guessing_merlin)
     def guess_merlin(self, pid):
@@ -149,40 +156,40 @@ class Game(object):
         else:
             self.winner = m.Team.good
 
-    @expect_status(m.GameStatus.done)
-    def get_winner(self):
-        return self._winner
-
-    def set_winner(self, winner):
-        self.status = m.GameStatus.done
-        self._winner = winner
-
-    winner = property(get_winner, set_winner)
-
-    @property
     @expect_initialized
-    def num_players(self):
-        return len(self.pids)
+    def get_visibility(self):
+        '''
+        @return: { pid : (Role, [pid])? }
+        Role being what pid sees the other pids as (either merlin or minion).
 
-    @property
-    @expect_initialized
-    def leader(self):
-        return self.pids[self._leader_idx]
+        '''
+        def strip_roles(result):
+            if result:
+                role, players = result
+                return (role, [p.pid for p in players])
+
+        return dict([(p.pid, strip_roles(r.can_see_which_other_players(p, self.players))) for p in self.players])
 
     @expect_initialized
-    def increment_leader(self):
+    def get_expected_team_size(self):
+        return r.size_of_proposed_team(self.state.current_quest, self.num_players)
+
+    @expect_initialized
+    def pid_to_role(self, pid):
+        return first_of(lambda p: p.pid == pid, self.players)
+
+    @expect_initialized
+    def role_to_pid(self, role):
+        return first_of(lambda p: p.role == role, self.players)
+
+    @expect_initialized
+    def _increment_leader(self):
         self._leader_idx = (self._leader_idx + 1) % self.num_players
 
     @expect_initialized
     def _are_unique_valid_pids(self, pids):
         return (all(p in self.pids for p in pids) and
                 len(pids) == len(set(pids)))
-
-    @expect_initialized
-    def pid_to_role(self, pid):
-        first = head([p for p in self.players if p.pid == pid])
-        if first:
-            return first.role
 
     def _update_error(self, error):
         self._errors.append(error)

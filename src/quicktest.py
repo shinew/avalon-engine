@@ -91,6 +91,6 @@ def negative_test(players):
         print_game(g)
 
 #positive_test(5, False)
-positive_test(10, True)
+#positive_test(10, True)
 #negative_test(5)
-#negative_test(10)
+negative_test(10)

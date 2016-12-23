@@ -1,10 +1,14 @@
 from copy import deepcopy
 
-def head(lst):
-    return lst[0] if len(lst) > 0 else None
+def first_of(pred, lst):
+    for x in lst:
+        if pred(x):
+            return x
 
-def first_of(lst, x):
-    return lst.index(x) if x in lst else None
+def index_of(pred, lst):
+    for i, x in enumerate(lst):
+        if pred(x):
+            return i
 
 def shuffle(lst, intgen):
     """
