@@ -6,6 +6,7 @@ from copy import deepcopy
 from collections import namedtuple
 
 import model as m
+from helper import first_of
 
 
 MIN_PLAYERS = 5
@@ -24,36 +25,35 @@ class GameState(object):
 
     @property
     def current_quest(self):
-        return self.quests.index(m.VoteStatus.unknown)
+        return first_of(self.quests, m.VoteStatus.unknown)
 
     @property
     def current_nomination(self):
-        return self.nominations.index(m.VoteStatus.unknown)
+        return first_of(self.nominations, m.VoteStatus.unknown)
 
     def increment_quest(self, vote_status):
-        self.quests[self.current_quest] = vote_status
-        self._clear_nominations()
+        if self.current_quest is not None:
+            self.quests[self.current_quest] = vote_status
+            self._clear_nominations()
 
     def _clear_nominations(self):
         self.nominations = [m.VoteStatus.unknown] * NUM_NOMINATIONS
 
     def increment_nomination(self, vote_status):
-        self.nominations[self.current_nomination] = vote_status
+        if self.current_nomination is not None:
+            self.nominations[self.current_nomination] = vote_status
 
     def does_good_win(self):
         return (self.does_good_win_minus_merlin() and
                 self.merlin is m.MerlinStatus.alive)
 
-    def does_good_win_minus_merlin(self):
+    def does_good_win_excluding_merlin(self):
         return self.quests.count(m.VoteStatus.succeeded) >= 3
 
     def does_evil_win(self):
         return (self.quests.count(m.VoteStatus.failed) >= 3 or
                 self.merlin is m.MerlinStatus.dead or
                 self.nominations.count(m.VoteStatus.failed) == 5)
-
-    def copy(self):
-        return deepcopy(self)
 
     def __str__(self):
         mapping = {
@@ -74,12 +74,14 @@ def num_good_players(num_players):
         9: 6,
         10: 6,
     }
-    return mapping[num_players]
+    return mapping.get(num_players)
 
 def num_evil_players(num_players):
     return num_players - num_good_players(num_players)
 
 def role_to_team(role):
+    if role is None:
+        return None
     good_roles = [m.Role.servant, m.Role.merlin, m.Role.percival]
     return m.Team.good if role in good_roles else m.Team.evil
 
@@ -90,6 +92,7 @@ def is_evil(role):
     return role_to_team(role) is m.Team.evil
 
 def size_of_proposed_team(quest, num_players):
+    # quest is 0-indexed
     mapping = [
         [2, 2, 2, 3, 3, 3],
         [3, 3, 3, 4, 4, 4],
@@ -97,12 +100,15 @@ def size_of_proposed_team(quest, num_players):
         [3, 3, 4, 5, 5, 5],
         [3, 4, 4, 5, 5, 5],
     ]
-    return mapping[quest][num_players - MIN_PLAYERS]
+    try:
+        return mapping[quest][num_players - MIN_PLAYERS]
+    except KeyError:
+        return None
 
-def votes_needed_for_team(num_players):
+def num_votes_for_team(num_players):
     return num_players / 2 + 1
 
-def votes_needed_for_quest(quest, num_players):
+def num_votes_for_quest(quest, num_players):
     if quest == 3 and num_players >= 7:
         return size_of_proposed_team(quest, num_players) - 1
     else:
@@ -114,7 +120,7 @@ def is_quest_vote_valid(vote, role):
 def can_see_which_other_players(player, players):
     '''
     Returns the pids for which this player can know of the others.
-    player -> [player] -> (Role, [player])
+    player -> [player] -> (Role, [player])?
 
     '''
     if player.role is m.Role.merlin:
@@ -131,3 +137,5 @@ def can_see_which_other_players(player, players):
                 filter(lambda p: (p != player and
                                   is_evil(p.role) and
                                   p.role is not m.Role.oberon), players))
+    else:
+        return None

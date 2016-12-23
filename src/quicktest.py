@@ -7,13 +7,12 @@ def print_game(game):
     print game
     print '-------------'
 
-def positive_test(players):
+def positive_test(players, guess_merlin_right):
     g = avalon.Game(lambda a,b: a)
     pids = range(players)
     g.add_players(pids)
     print g.players
     print g.get_visibility()
-    print g.leader_idx, g.leader
 
     # 3 missions, each going until the 5th nomination, and the mission passes
     for mission in range(3):
@@ -22,7 +21,7 @@ def positive_test(players):
             print 'nomination: {}'.format(nomination)
             g.nominate_team(random.sample(pids, r.size_of_proposed_team(mission, players)))
             print_game(g)
-            yeses = random.sample(pids, random.randint(0, r.votes_needed_for_team(players) - 1))
+            yeses = random.sample(pids, random.randint(0, r.num_votes_for_team(players) - 1))
             g.vote_for_team(map(lambda p: r.PlayerVote(p, m.Vote.yes if p in yeses else m.Vote.no), pids))
             print_game(g)
 
@@ -35,9 +34,12 @@ def positive_test(players):
         print 'missioning'
         print_game(g)
 
-    # guessed merlin correctly
+    # guessed merlin incorrectly
     print g.players
-    g.guess_merlin(0)
+    if guess_merlin_right:
+        g.guess_merlin(0)
+    else:
+        g.guess_merlin(1)
     print_game(g)
 
 
@@ -47,7 +49,6 @@ def negative_test(players):
     g.add_players(pids)
     print g.players
     print g.get_visibility()
-    print g.leader_idx, g.leader
 
     # 2 missions, each going until the 5th nomination, and the mission passes
     for mission in range(2):
@@ -56,7 +57,7 @@ def negative_test(players):
             print 'nomination: {}'.format(nomination)
             g.nominate_team(random.sample(pids, r.size_of_proposed_team(mission, players)))
             print_game(g)
-            yeses = random.sample(pids, random.randint(0, r.votes_needed_for_team(players) - 1))
+            yeses = random.sample(pids, random.randint(0, r.num_votes_for_team(players) - 1))
             g.vote_for_team(map(lambda p: r.PlayerVote(p, m.Vote.yes if p in yeses else m.Vote.no), pids))
             print_game(g)
 
@@ -75,7 +76,7 @@ def negative_test(players):
             print 'nomination: {}'.format(nomination)
             g.nominate_team(random.sample(pids, r.size_of_proposed_team(mission, players)))
             print_game(g)
-            yeses = random.sample(pids, random.randint(0, r.votes_needed_for_team(players) - 1))
+            yeses = random.sample(pids, random.randint(0, r.num_votes_for_team(players) - 1))
             g.vote_for_team(map(lambda p: r.PlayerVote(p, m.Vote.yes if p in yeses else m.Vote.no), pids))
             print_game(g)
 
@@ -89,7 +90,7 @@ def negative_test(players):
         print 'missioning'
         print_game(g)
 
-#positive_test(5)
-#positive_test(10)
+#positive_test(5, False)
+positive_test(10, True)
 #negative_test(5)
-negative_test(10)
+#negative_test(10)

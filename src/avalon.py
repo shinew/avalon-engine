@@ -5,7 +5,7 @@ from random import randint
 
 import model as m
 import rules as r
-from helper import shuffle
+from helper import shuffle, head
 
 def get_default_good_roles(num_players):
     num_good_players = r.num_good_players(num_players)
@@ -55,11 +55,12 @@ class Game(object):
         self.pids = []
         self.players = []
         self.state = r.GameState()
-        self.leader_idx = 0  # index of pids
         self.current_team = []  # list of pids
+
+        self._leader_idx = 0  # index of pids
         self._winner = None
-        self.error = None
-        self.intgen = intgen
+        self._errors = []
+        self._intgen = intgen
 
     @expect_status(m.GameStatus.not_started)
     def add_players(self, pids):
@@ -69,8 +70,8 @@ class Game(object):
             return
         self.status = m.GameStatus.nominating_team
         self.pids = deepcopy(pids)
-        self.leader_idx = self.intgen(0, len(pids) - 1)
-        self.players = assign_team_ids(pids, self.intgen)
+        self._leader_idx = self._intgen(0, len(pids) - 1)
+        self.players = assign_team_ids(pids, self._intgen)
 
     @expect_initialized
     def get_visibility(self):
@@ -108,7 +109,7 @@ class Game(object):
             return
 
         yes_votes = len([pv for pv in pid_votes if pv.vote == m.Vote.yes])
-        if yes_votes >= r.votes_needed_for_team(self.num_players):
+        if yes_votes >= r.num_votes_for_team(self.num_players):
             self.status = m.GameStatus.voting_for_mission
             self.state.increment_nomination(m.VoteStatus.succeeded)
         else:
@@ -123,17 +124,17 @@ class Game(object):
     def vote_for_mission(self, pid_votes):
         if (not self._are_unique_valid_pids([pv.pid for pv in pid_votes]) or
             set([pv.pid for pv in pid_votes]) != self.current_team or
-            not all(r.is_quest_vote_valid(pv.vote, self._pid_to_role(pv.pid)) for pv in pid_votes)):
+            not all(r.is_quest_vote_valid(pv.vote, self.pid_to_role(pv.pid)) for pv in pid_votes)):
             self._update_error('bad vote-for-mission')
             return
 
         yes_votes = [pv.vote for pv in pid_votes].count(m.Vote.yes)
-        if yes_votes >= r.votes_needed_for_quest(self.state.current_quest, self.num_players):
+        if yes_votes >= r.num_votes_for_quest(self.state.current_quest, self.num_players):
             self.state.increment_quest(m.VoteStatus.succeeded)
         else:
             self.state.increment_quest(m.VoteStatus.failed)
 
-        if self.state.does_good_win_minus_merlin():
+        if self.state.does_good_win_excluding_merlin():
             self.status = m.GameStatus.guessing_merlin
         elif self.state.does_evil_win():
             self.winner = m.Team.evil
@@ -143,7 +144,7 @@ class Game(object):
 
     @expect_status(m.GameStatus.guessing_merlin)
     def guess_merlin(self, pid):
-        if self._pid_to_role(pid) is m.Role.merlin:
+        if self.pid_to_role(pid) is m.Role.merlin:
             self.winner = m.Team.evil
         else:
             self.winner = m.Team.good
@@ -166,28 +167,29 @@ class Game(object):
     @property
     @expect_initialized
     def leader(self):
-        return self.pids[self.leader_idx]
+        return self.pids[self._leader_idx]
 
+    @expect_initialized
     def increment_leader(self):
-        self.leader_idx = (self.leader_idx + 1) % self.num_players
+        self._leader_idx = (self._leader_idx + 1) % self.num_players
 
+    @expect_initialized
     def _are_unique_valid_pids(self, pids):
         return (all(p in self.pids for p in pids) and
                 len(pids) == len(set(pids)))
 
-    def _pid_to_role(self, pid):
-        return [p for p in self.players if p.pid == pid][0].role
+    @expect_initialized
+    def pid_to_role(self, pid):
+        first = head([p for p in self.players if p.pid == pid])
+        if first:
+            return first.role
 
     def _update_error(self, error):
-        self.status = m.GameStatus.error
-        self.error = error
-
-    def copy(self):
-        return deepcopy(self)
+        self._errors.append(error)
 
     def __str__(self):
         ret = 'Status: {}\nState: {}\nCurrent Leader: {}\nCurrent Team: {}\nWinner: {}'.format(
             self.status, self.state, self.leader, self.current_team, self._winner)
-        if self.error:
-            ret += '\nError:{}'.format(self.error)
+        if self._errors:
+            ret += '\nErrors: {}'.format(self._errors)
         return ret
